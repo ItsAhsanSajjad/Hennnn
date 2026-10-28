@@ -1,0 +1,11 @@
+<svg width="360" height="96" viewBox="0 0 360 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">PakHen wordmark</title>
+  <rect width="96" height="96" rx="20" fill="#123D2B"/>
+  <path d="M28 60C28 43.431 41.431 30 58 30H64V42H58C48.059 42 40 50.059 40 60V66H28V60Z" fill="#FBF7ED"/>
+  <path d="M40 66C40 55.507 48.507 47 59 47H68V59H59C55.134 59 52 62.134 52 66H40Z" fill="#D9982F"/>
+  <circle cx="65" cy="31" r="7" fill="#D9982F"/>
+  <path d="M63 21L70 12L72 24L63 21Z" fill="#4E7E4B"/>
+  <text x="120" y="58" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="40" font-weight="800" fill="#123D2B">PakHen</text>
+  <text x="122" y="78" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="14" font-weight="600" fill="#4E7E4B">Smart Poultry. Clear Growth.</text>
+</svg>
+

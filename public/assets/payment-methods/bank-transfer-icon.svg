@@ -1,0 +1,39 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gmeBankNavy" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#10222D" />
+      <stop offset="100%" stopColor="#061A2B" />
+    </linearGradient>
+    <linearGradient id="gmeBankCopper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#F59B52" />
+      <stop offset="100%" stopColor="#D8793F" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Subtle circular transfer halo -->
+  <circle cx="32" cy="32" r="28" stroke="url(#gmeBankCopper)" stroke-opacity="0.15" stroke-width="2" stroke-dasharray="4 4" />
+  
+  <!-- Bank Pediment / Roof -->
+  <path d="M32 12 L14 21 L50 21 Z" fill="url(#gmeBankNavy)" />
+  <path d="M32 12 L14 21 L50 21 Z" stroke="url(#gmeBankCopper)" stroke-width="2" stroke-linejoin="round" />
+  
+  <!-- Architrave Beam -->
+  <rect x="13" y="21" width="38" height="3.5" rx="1" fill="url(#gmeBankCopper)" />
+  
+  <!-- Classical Pillars -->
+  <rect x="17" y="26" width="4.5" height="17" rx="1" fill="url(#gmeBankNavy)" />
+  <rect x="25.5" y="26" width="4.5" height="17" rx="1" fill="url(#gmeBankNavy)" />
+  <rect x="34" y="26" width="4.5" height="17" rx="1" fill="url(#gmeBankNavy)" />
+  <rect x="42.5" y="26" width="4.5" height="17" rx="1" fill="url(#gmeBankNavy)" />
+  
+  <!-- Stepped Podium / Foundation -->
+  <rect x="13" y="44" width="38" height="3" rx="1" fill="url(#gmeBankCopper)" />
+  <rect x="10" y="48" width="44" height="4" rx="1.5" fill="url(#gmeBankNavy)" />
+  
+  <!-- Subtle Transfer Arrow Badge (Bottom Right Accent) -->
+  <g transform="translate(37, 33)">
+    <circle cx="11" cy="11" r="10" fill="#FFF8EC" stroke="url(#gmeBankCopper)" stroke-width="1.8" />
+    <path d="M7 10 L15 10 M12 7 L15 10 L12 13" stroke="#8C3A14" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M15 12 L7 12 M10 15 L7 12 L10 9" stroke="#D8793F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+</svg>
