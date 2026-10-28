@@ -1,0 +1,58 @@
+# dependencies
+node_modules
+.pnp
+
+# Next.js
+.next
+out
+next-env.d.ts
+
+# production
+dist
+build
+
+# environment
+# .env is deliberately tracked for zero-config onboarding across devices
+# .env.local remains ignored for local-only overrides
+.env*.local
+!.env
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+*.zip
+*.tar.gz
+
+# testing
+coverage
+test-results
+playwright-report
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# local data and uploads
+uploads/
+local-uploads/
+temp-test-uploads/
+.private-storage/
+tmp/
+*.sqlite
+*.sqlite3
+*.db
+prisma/*.db
+prisma/*.sqlite
+prisma/*.sqlite3
+.git.invalid*
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+.claude/
+reference-audit/
+responsive-audit/

@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    container_name: pakhen-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pakhen_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-pakhen}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pakhen_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pakhen_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pakhen} -d ${POSTGRES_DB:-pakhen_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-test:
+    image: postgres:17.6-alpine
+    profiles: ["test"]
+    container_name: pakhen-postgres-test
+    restart: "no"
+    environment:
+      POSTGRES_DB: ${POSTGRES_TEST_DB:-pakhen_test}
+      POSTGRES_USER: ${POSTGRES_TEST_USER:-pakhen}
+      POSTGRES_PASSWORD: ${POSTGRES_TEST_PASSWORD:-pakhen_test_password}
+    ports:
+      - "${POSTGRES_TEST_PORT:-55432}:5432"
+    volumes:
+      - pakhen_postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_TEST_USER:-pakhen} -d ${POSTGRES_TEST_DB:-pakhen_test}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  pakhen_postgres_data:
+  pakhen_postgres_test_data:

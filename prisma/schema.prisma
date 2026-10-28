@@ -1,0 +1,958 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  VIEWER
+  SUPPORT
+  FINANCE
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum DocumentType {
+  TERMS
+  PRIVACY
+}
+
+enum AuditAction {
+  USER_REGISTERED
+  USER_LOGIN_SUCCEEDED
+  USER_LOGIN_FAILED
+  USER_LOGGED_OUT
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  PASSWORD_CHANGED
+  REFERRAL_ATTACHED
+  USER_SUSPENDED
+  USER_REACTIVATED
+  USER_ROLE_CHANGED
+  APP_SETTING_UPDATED
+  HEN_PLAN_CREATED
+  HEN_PLAN_UPDATED
+  PAYMENT_ACCOUNT_UPDATED
+  PURCHASE_ORDER_CREATED
+  PAYMENT_PROOF_UPLOADED
+  PAYMENT_SUBMITTED
+  PAYMENT_APPROVED
+  PAYMENT_REJECTED
+  HEN_ASSET_ACTIVATED
+  HEN_ASSET_SUSPENDED
+  EGG_ACCRUAL_RUN
+  EGG_LEDGER_ADJUSTED
+  EGG_SALE_RATE_CREATED
+  EGG_SALE_RATE_UPDATED
+  EGG_SALE_SUBMITTED
+  EGG_SALE_CANCELLED
+  EGG_SALE_REVIEW_CLAIMED
+  EGG_SALE_APPROVED
+  EGG_SALE_REJECTED
+  EGG_SALE_RESERVATION_CREATED
+  EGG_SALE_RESERVATION_RELEASED
+  EGG_SALE_FINALIZED
+  PAYOUT_METHOD_CREATED
+  PAYOUT_METHOD_UPDATED
+  SETTLEMENT_CREATED
+  SETTLEMENT_CONFIRMED
+  SETTLEMENT_FAILED
+  REFERRAL_RULE_CREATED
+  REFERRAL_RULE_UPDATED
+  REFERRAL_REWARD_CREDITED
+  RECONCILIATION_RUN
+  EGG_MARKET_CREATED
+  EGG_MARKET_UPDATED
+  EGG_MARKET_SALE_COMPLETED
+  EGG_MARKET_SALE_REVERSED
+  EGG_PAYOUT_SUBMITTED
+  EGG_PAYOUT_PROCESSING
+  EGG_PAYOUT_PAID
+  EGG_PAYOUT_REJECTED
+  EGG_PAYOUT_CANCELLED
+}
+
+enum NotificationType {
+  ACCOUNT
+  SECURITY
+  SYSTEM
+  SALE
+  SETTLEMENT
+  REFERRAL
+}
+
+enum HenPlanStatus {
+  DRAFT
+  INACTIVE
+  ACTIVE
+  ARCHIVED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  AWAITING_PAYMENT
+  PAYMENT_SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentSubmissionStatus {
+  PENDING
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  MANUAL
+  PAYBOST
+}
+
+enum PaymentAccountProvider {
+  EASYPAISA
+  JAZZCASH
+  BANK_TRANSFER
+  OTHER
+}
+
+enum HenAssetStatus {
+  PENDING_ACTIVATION
+  ACTIVE
+  SUSPENDED
+  COMPLETED
+  EXPIRED
+  CANCELLED
+  REFUNDED
+}
+
+enum EggLedgerEntryType {
+  PRODUCTION_CREDIT
+  ADMIN_CREDIT
+  ADMIN_DEBIT
+  REVERSAL
+  FUTURE_SALE_HOLD
+  FUTURE_SALE_DEBIT
+  FUTURE_REFERRAL_CREDIT
+  SALE_RESERVATION
+  SALE_RELEASE
+  SALE_FINALIZED
+  REFERRAL_CREDIT
+}
+
+enum EggLedgerSourceType {
+  EGG_ACCRUAL
+  ADMIN_ADJUSTMENT
+  REVERSAL
+  FUTURE_SYSTEM
+  EGG_SALE
+  REFERRAL_REWARD
+}
+
+enum EggSaleStatus {
+  AWAITING_REVIEW
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  PAYMENT_PROCESSING
+  REJECTED
+  CANCELLED
+  PAID
+}
+
+enum PayoutStatus {
+  DRAFT
+  RECORDED
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+enum ReferralRewardStatus {
+  PENDING
+  CREDITED
+  REVERSED
+  VOID
+}
+
+enum PayoutMethodProvider {
+  EASYPAISA
+  JAZZCASH
+  BANK_TRANSFER
+  OTHER
+}
+
+enum PayoutMethodStatus {
+  ACTIVE
+  DISABLED
+  ARCHIVED
+}
+
+model User {
+  id                 String     @id @default(uuid()) @db.Uuid
+  name               String?
+  email              String?    @unique
+  emailVerified      DateTime?
+  image              String?
+  username           String     @db.VarChar(24)
+  usernameNormalized String     @unique @db.VarChar(24)
+  phoneE164          String     @unique @db.VarChar(20)
+  passwordHash       String
+  role               UserRole   @default(USER)
+  status             UserStatus @default(ACTIVE)
+  referralCode       String     @unique @db.VarChar(24)
+  phoneVerifiedAt    DateTime?
+  lastLoginAt        DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  sessions                   Session[]
+  legalAcceptances           LegalAcceptance[]
+  notifications              Notification[]
+  passwordResetTokens        PasswordResetToken[]
+  invitedUsers               ReferralRelationship[] @relation("ReferralInviter")
+  invitedBy                  ReferralRelationship?  @relation("ReferralInvitee")
+  auditLogs                  AuditLog[]             @relation("AuditActor")
+  updatedSettings            AppSetting[]           @relation("SettingUpdater")
+  purchaseOrders             PurchaseOrder[]
+  paymentSubmissions         PaymentSubmission[]    @relation("PaymentSubmitter")
+  reviewedPaymentSubmissions PaymentSubmission[]    @relation("PaymentReviewer")
+  uploadedPaymentProofs      PaymentProof[]
+  createdHenPlans            HenPlan[]              @relation("PlanCreator")
+  updatedHenPlans            HenPlan[]              @relation("PlanUpdater")
+  createdPaymentAccounts     PaymentAccount[]       @relation("PaymentAccountCreator")
+  updatedPaymentAccounts     PaymentAccount[]       @relation("PaymentAccountUpdater")
+  henAssets                  HenAsset[]
+  eggLedgerEntries           EggLedgerEntry[]
+  eggSaleRequests            EggSaleRequest[]
+  reviewedEggSaleRequests    EggSaleRequest[]       @relation("EggSaleReviewer")
+  createdEggSaleRates        EggSaleRate[]          @relation("EggSaleRateCreator")
+  updatedEggSaleRates        EggSaleRate[]          @relation("EggSaleRateUpdater")
+  payoutMethods              PayoutMethod[]
+  payouts                    Payout[]
+  createdPayouts             Payout[]               @relation("PayoutCreator")
+  confirmedPayouts           Payout[]               @relation("PayoutConfirmer")
+  referralRewards            ReferralReward[]       @relation("ReferralRewardInviter")
+  invitedReferralRewards     ReferralReward[]       @relation("ReferralRewardInvitee")
+  createdReferralRules       ReferralRule[]         @relation("ReferralRuleCreator")
+  updatedReferralRules       ReferralRule[]         @relation("ReferralRuleUpdater")
+  prizeClaims                PrizeClaim[]
+  milestoneClaims            MilestoneRewardClaim[]
+  createdEggMarkets          EggMarket[]            @relation("EggMarketCreator")
+  updatedEggMarkets          EggMarket[]            @relation("EggMarketUpdater")
+  eggMarketSales             EggMarketSale[]
+  reviewedEggMarketSales     EggMarketSale[]        @relation("EggMarketSaleReviewer")
+  reversedEggMarketSales     EggMarketSale[]        @relation("EggMarketSaleReverser")
+
+  @@index([role])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  sessionToken String   @unique
+  userId       String   @db.Uuid
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+}
+
+model ReferralRelationship {
+  id         String   @id @default(uuid()) @db.Uuid
+  inviterId  String   @db.Uuid
+  inviteeId  String   @unique @db.Uuid
+  sourceCode String   @db.VarChar(24)
+  createdAt  DateTime @default(now())
+
+  inviter User             @relation("ReferralInviter", fields: [inviterId], references: [id], onDelete: Restrict)
+  invitee User             @relation("ReferralInvitee", fields: [inviteeId], references: [id], onDelete: Restrict)
+  rewards ReferralReward[]
+
+  @@index([inviterId])
+  @@index([sourceCode])
+}
+
+model LegalAcceptance {
+  id              String       @id @default(uuid()) @db.Uuid
+  userId          String       @db.Uuid
+  documentType    DocumentType
+  documentVersion String       @db.VarChar(32)
+  acceptedAt      DateTime     @default(now())
+  ipAddress       String?
+  userAgent       String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentType, documentVersion])
+  @@index([acceptedAt])
+}
+
+model AuditLog {
+  id          String      @id @default(uuid()) @db.Uuid
+  actorUserId String?     @db.Uuid
+  action      AuditAction
+  entityType  String      @db.VarChar(80)
+  entityId    String?     @db.VarChar(120)
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  type      NotificationType
+  title     String           @db.VarChar(120)
+  message   String           @db.VarChar(500)
+  readAt    DateTime?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([createdAt])
+}
+
+model AppSetting {
+  id              String   @id @default(uuid()) @db.Uuid
+  key             String   @unique @db.VarChar(120)
+  value           Json
+  isPublic        Boolean  @default(false)
+  updatedByUserId String?  @db.Uuid
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  updatedBy User? @relation("SettingUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+}
+
+model IdempotencyRecord {
+  id           String   @id @default(uuid()) @db.Uuid
+  key          String   @db.VarChar(120)
+  scope        String   @db.VarChar(80)
+  requestHash  String   @db.VarChar(128)
+  responseData Json?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@unique([scope, key])
+  @@index([expiresAt])
+}
+
+model HenPlan {
+  id               String        @id @default(uuid()) @db.Uuid
+  code             String        @unique @db.VarChar(40)
+  name             String        @db.VarChar(120)
+  slug             String        @unique @db.VarChar(140)
+  shortDescription String        @db.VarChar(220)
+  fullDescription  String
+  pricePaisa       BigInt        @db.BigInt
+  dailyEggUnits    Int
+  maximumEggUnits  Int
+  validityDays     Int
+  minimumQuantity  Int           @default(1)
+  maximumQuantity  Int           @default(1)
+  status           HenPlanStatus @default(DRAFT)
+  isActive         Boolean       @default(false)
+  isFeatured       Boolean       @default(false)
+  displayOrder     Int           @default(0)
+  termsVersion     String        @db.VarChar(32)
+  createdByUserId  String?       @db.Uuid
+  updatedByUserId  String?       @db.Uuid
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  archivedAt       DateTime?
+
+  createdBy      User?           @relation("PlanCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy      User?           @relation("PlanUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  purchaseOrders PurchaseOrder[]
+  henAssets      HenAsset[]
+
+  @@index([status, isActive, displayOrder])
+  @@index([archivedAt])
+}
+
+model PaymentAccount {
+  id                         String                 @id @default(uuid()) @db.Uuid
+  provider                   PaymentAccountProvider
+  accountTitle               String                 @db.VarChar(120)
+  accountIdentifierProtected String                 @db.VarChar(180)
+  accountIdentifierLastFour  String                 @db.VarChar(12)
+  bankName                   String?                @db.VarChar(120)
+  iban                       String?                @db.VarChar(40)
+  isVerified                 Boolean                @default(true)
+  instructions               String
+  isActive                   Boolean                @default(false)
+  displayOrder               Int                    @default(0)
+  createdByUserId            String?                @db.Uuid
+  updatedByUserId            String?                @db.Uuid
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+  archivedAt                 DateTime?
+
+  createdBy          User?               @relation("PaymentAccountCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy          User?               @relation("PaymentAccountUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  paymentSubmissions PaymentSubmission[]
+
+  @@index([isActive, displayOrder])
+  @@index([archivedAt])
+}
+
+model PurchaseOrder {
+  id                      String              @id @default(uuid()) @db.Uuid
+  orderReference          String              @unique @db.VarChar(40)
+  userId                  String              @db.Uuid
+  henPlanId               String              @db.Uuid
+  status                  PurchaseOrderStatus @default(AWAITING_PAYMENT)
+  quantity                Int
+  unitPricePaisa          BigInt              @db.BigInt
+  totalAmountPaisa        BigInt              @db.BigInt
+  planNameSnapshot        String              @db.VarChar(120)
+  planCodeSnapshot        String              @db.VarChar(40)
+  dailyEggUnitsSnapshot   Int
+  maximumEggUnitsSnapshot Int
+  validityDaysSnapshot    Int
+  termsVersionSnapshot    String              @db.VarChar(32)
+  paymentDueAt            DateTime
+  submittedAt             DateTime?
+  approvedAt              DateTime?
+  rejectedAt              DateTime?
+  cancelledAt             DateTime?
+  rejectionReason         String?
+  idempotencyKey          String?             @db.VarChar(120)
+  idempotencyRequestHash  String?             @db.VarChar(128)
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  henPlan            HenPlan             @relation(fields: [henPlanId], references: [id], onDelete: Restrict)
+  paymentSubmissions PaymentSubmission[]
+  henAssets          HenAsset[]
+  referralRewards    ReferralReward[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status])
+  @@index([henPlanId])
+  @@index([createdAt])
+  @@index([paymentDueAt])
+}
+
+model PaymentSubmission {
+  id                             String                  @id @default(uuid()) @db.Uuid
+  purchaseOrderId                String                  @db.Uuid
+  paymentAccountId               String?                 @db.Uuid
+  submittedByUserId              String                  @db.Uuid
+  transactionReference           String                  @db.VarChar(120)
+  transactionReferenceNormalized String                  @unique @db.VarChar(120)
+  amountPaisaSnapshot            BigInt                  @db.BigInt
+  status                         PaymentSubmissionStatus @default(SUBMITTED)
+  method                         PaymentMethod           @default(MANUAL)
+  gatewayIdentifier              String?                 @unique @db.VarChar(120)
+  gatewayStatus                  String?                 @db.VarChar(60)
+  gatewayTxnId                   String?                 @db.VarChar(120)
+  submittedAt                    DateTime                @default(now())
+  reviewedAt                     DateTime?
+  reviewedByUserId               String?                 @db.Uuid
+  reviewNotes                    String?
+  rejectionReason                String?
+  createdAt                      DateTime                @default(now())
+  updatedAt                      DateTime                @updatedAt
+
+  submittedBy    User            @relation("PaymentSubmitter", fields: [submittedByUserId], references: [id], onDelete: Restrict)
+  reviewedBy     User?           @relation("PaymentReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  purchaseOrder  PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  paymentAccount PaymentAccount? @relation(fields: [paymentAccountId], references: [id], onDelete: SetNull)
+  proofs         PaymentProof[]
+
+  @@index([submittedByUserId, status])
+  @@index([purchaseOrderId])
+  @@index([submittedAt])
+}
+
+model PaymentProof {
+  id                  String    @id @default(uuid()) @db.Uuid
+  paymentSubmissionId String    @db.Uuid
+  storageProvider     String    @db.VarChar(40)
+  storageKey          String    @unique @db.VarChar(300)
+  originalFileName    String    @db.VarChar(180)
+  safeFileName        String    @db.VarChar(180)
+  mimeType            String    @db.VarChar(120)
+  sizeBytes           Int
+  sha256Hash          String    @unique @db.VarChar(64)
+  imageWidth          Int?
+  imageHeight         Int?
+  uploadedByUserId    String    @db.Uuid
+  createdAt           DateTime  @default(now())
+  deletedAt           DateTime?
+
+  paymentSubmission PaymentSubmission @relation(fields: [paymentSubmissionId], references: [id], onDelete: Cascade)
+  uploadedBy        User              @relation(fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([paymentSubmissionId])
+  @@index([uploadedByUserId])
+  @@index([createdAt])
+}
+
+model HenAsset {
+  id                    String         @id @default(uuid()) @db.Uuid
+  userId                String         @db.Uuid
+  purchaseOrderId       String         @unique @db.Uuid
+  henPlanId             String         @db.Uuid
+  status                HenAssetStatus @default(PENDING_ACTIVATION)
+  quantity              Int
+  activatedAt           DateTime?
+  productionStartDate   DateTime?
+  productionEndDate     DateTime?
+  dailyEggUnitsPerHen   Int
+  maximumEggUnitsPerHen Int
+  totalMaximumEggUnits  Int
+  totalEggUnitsProduced Int            @default(0)
+  suspendedAt           DateTime?
+  suspensionReason      String?
+  completedAt           DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  user          User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  henPlan       HenPlan          @relation(fields: [henPlanId], references: [id], onDelete: Restrict)
+  purchaseOrder PurchaseOrder    @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  eggAccruals   EggAccrual[]
+  eggEntries    EggLedgerEntry[]
+
+  @@index([userId, status])
+  @@index([henPlanId])
+  @@index([productionStartDate, productionEndDate])
+}
+
+model EggAccrual {
+  id             String   @id @default(uuid()) @db.Uuid
+  henAssetId     String   @db.Uuid
+  productionDate DateTime @db.Date
+  quantity       Int
+  eggUnits       Int
+  idempotencyKey String   @unique @db.VarChar(160)
+  createdAt      DateTime @default(now())
+
+  henAsset      HenAsset         @relation(fields: [henAssetId], references: [id], onDelete: Restrict)
+  ledgerEntries EggLedgerEntry[]
+
+  @@unique([henAssetId, productionDate])
+  @@index([productionDate])
+}
+
+model EggLedgerEntry {
+  id              String              @id @default(uuid()) @db.Uuid
+  userId          String              @db.Uuid
+  henAssetId      String?             @db.Uuid
+  eggAccrualId    String?             @db.Uuid
+  entryType       EggLedgerEntryType
+  eggUnits        Int
+  description     String              @db.VarChar(240)
+  sourceType      EggLedgerSourceType
+  sourceId        String?             @db.VarChar(120)
+  idempotencyKey  String              @unique @db.VarChar(160)
+  metadata        Json?
+  reversedEntryId String?             @db.Uuid
+  createdAt       DateTime            @default(now())
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  henAsset       HenAsset?        @relation(fields: [henAssetId], references: [id], onDelete: SetNull)
+  eggAccrual     EggAccrual?      @relation(fields: [eggAccrualId], references: [id], onDelete: SetNull)
+  reversedEntry  EggLedgerEntry?  @relation("LedgerReversal", fields: [reversedEntryId], references: [id], onDelete: Restrict)
+  reversals              EggLedgerEntry[] @relation("LedgerReversal")
+  referralReward         ReferralReward?
+  eggMarketSale          EggMarketSale?   @relation("EggMarketSaleLedgerEntry")
+  eggMarketSaleReversal  EggMarketSale?   @relation("EggMarketSaleReversalLedgerEntry")
+
+  @@index([userId, createdAt])
+  @@index([henAssetId])
+  @@index([eggAccrualId])
+  @@index([sourceType, sourceId])
+}
+
+model EggSaleRate {
+  id              String    @id @default(uuid()) @db.Uuid
+  code            String    @db.VarChar(40)
+  name            String    @db.VarChar(120)
+  ratePaisaPerEgg BigInt    @db.BigInt
+  effectiveFrom   DateTime
+  effectiveUntil  DateTime?
+  isActive        Boolean   @default(false)
+  notes           String?
+  createdByUserId String?   @db.Uuid
+  updatedByUserId String?   @db.Uuid
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  archivedAt      DateTime?
+
+  createdBy    User?            @relation("EggSaleRateCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy    User?            @relation("EggSaleRateUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  saleRequests EggSaleRequest[]
+
+  @@index([code, isActive, effectiveFrom, effectiveUntil])
+  @@index([archivedAt])
+}
+
+model EggSaleRequest {
+  id                                String                @id @default(uuid()) @db.Uuid
+  publicReference                   String                @unique @db.VarChar(40)
+  userId                            String                @db.Uuid
+  payoutMethodId                    String?               @db.Uuid
+  status                            EggSaleStatus         @default(AWAITING_REVIEW)
+  eggQuantity                       Int
+  rateId                            String                @db.Uuid
+  rateCodeSnapshot                  String                @db.VarChar(40)
+  ratePaisaPerEggSnapshot           BigInt                @db.BigInt
+  totalAmountPaisa                  BigInt                @db.BigInt
+  payoutProviderSnapshot            PayoutMethodProvider?
+  payoutAccountTitleSnapshot        String?               @db.VarChar(120)
+  payoutIdentifierMaskedSnapshot    String?               @db.VarChar(180)
+  payoutIdentifierProtectedSnapshot String?               @db.VarChar(255)
+  submittedAt                       DateTime              @default(now())
+  underReviewAt                     DateTime?
+  paymentProcessingAt               DateTime?
+  reviewedAt                        DateTime?
+  reviewedByUserId                  String?               @db.Uuid
+  approvedAt                        DateTime?
+  rejectedAt                        DateTime?
+  cancelledAt                       DateTime?
+  paidAt                            DateTime?
+  rejectionCategory                 String?               @db.VarChar(80)
+  userVisibleReason                 String?
+  internalReviewNotes               String?
+  idempotencyKey                    String                @db.VarChar(120)
+  idempotencyRequestHash            String                @db.VarChar(128)
+  createdAt                         DateTime              @default(now())
+  updatedAt                         DateTime              @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  payoutMethod PayoutMethod? @relation(fields: [payoutMethodId], references: [id], onDelete: SetNull)
+  rate         EggSaleRate   @relation(fields: [rateId], references: [id], onDelete: Restrict)
+  reviewedBy   User?         @relation("EggSaleReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  payouts      Payout[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status])
+  @@index([status, submittedAt])
+  @@index([rateId])
+  @@index([payoutMethodId])
+  @@index([createdAt])
+}
+
+model PayoutMethod {
+  id                         String               @id @default(uuid()) @db.Uuid
+  userId                     String               @db.Uuid
+  provider                   PayoutMethodProvider
+  bankName                   String?              @db.VarChar(120)
+  accountTitle               String               @db.VarChar(120)
+  accountIdentifierProtected String               @db.VarChar(255)
+  accountIdentifierLastFour  String               @db.VarChar(12)
+  status                     PayoutMethodStatus   @default(ACTIVE)
+  isDefault                  Boolean              @default(false)
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  archivedAt                 DateTime?
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  saleRequests EggSaleRequest[]
+  payouts      Payout[]
+
+  @@index([userId, status, isDefault])
+  @@index([archivedAt])
+}
+
+model Payout {
+  id                                String       @id @default(uuid()) @db.Uuid
+  userId                            String       @db.Uuid
+  eggSaleRequestId                  String       @db.Uuid
+  payoutMethodId                    String?      @db.Uuid
+  amountPaisa                       BigInt       @db.BigInt
+  status                            PayoutStatus @default(RECORDED)
+  settlementReference               String       @db.VarChar(120)
+  settlementReferenceNormalized     String       @unique @db.VarChar(120)
+  payoutProviderSnapshot            String       @db.VarChar(40)
+  payoutIdentifierMaskedSnapshot    String       @db.VarChar(180)
+  payoutIdentifierProtectedSnapshot String?      @db.VarChar(255)
+  notes                             String?
+  createdByUserId                   String?      @db.Uuid
+  confirmedByUserId                 String?      @db.Uuid
+  recordedAt                        DateTime     @default(now())
+  confirmedAt                       DateTime?
+  failedAt                          DateTime?
+  createdAt                         DateTime     @default(now())
+  updatedAt                         DateTime     @updatedAt
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  eggSaleRequest EggSaleRequest @relation(fields: [eggSaleRequestId], references: [id], onDelete: Restrict)
+  payoutMethod   PayoutMethod?  @relation(fields: [payoutMethodId], references: [id], onDelete: SetNull)
+  createdBy      User?          @relation("PayoutCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  confirmedBy    User?          @relation("PayoutConfirmer", fields: [confirmedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([eggSaleRequestId])
+  @@index([userId, status])
+  @@index([eggSaleRequestId])
+  @@index([createdAt])
+}
+
+model ReferralRule {
+  id              String    @id @default(uuid()) @db.Uuid
+  code            String    @unique @db.VarChar(40)
+  name            String    @db.VarChar(120)
+  rewardEggUnits  Int
+  isActive        Boolean   @default(false)
+  effectiveFrom   DateTime
+  effectiveUntil  DateTime?
+  notes           String?
+  createdByUserId String?   @db.Uuid
+  updatedByUserId String?   @db.Uuid
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  archivedAt      DateTime?
+
+  createdBy User?            @relation("ReferralRuleCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy User?            @relation("ReferralRuleUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  rewards   ReferralReward[]
+
+  @@index([isActive, effectiveFrom, effectiveUntil])
+  @@index([archivedAt])
+}
+
+model ReferralReward {
+  id                        String               @id @default(uuid()) @db.Uuid
+  inviterUserId             String               @db.Uuid
+  inviteeUserId             String               @db.Uuid
+  relationshipId            String               @db.Uuid
+  ruleId                    String               @db.Uuid
+  qualifyingPurchaseOrderId String               @db.Uuid
+  ledgerEntryId             String?              @unique @db.Uuid
+  rewardEggUnits            Int
+  status                    ReferralRewardStatus @default(PENDING)
+  idempotencyKey            String               @unique @db.VarChar(160)
+  createdAt                 DateTime             @default(now())
+  creditedAt                DateTime?
+  voidedAt                  DateTime?
+
+  inviter                 User                 @relation("ReferralRewardInviter", fields: [inviterUserId], references: [id], onDelete: Restrict)
+  invitee                 User                 @relation("ReferralRewardInvitee", fields: [inviteeUserId], references: [id], onDelete: Restrict)
+  relationship            ReferralRelationship @relation(fields: [relationshipId], references: [id], onDelete: Restrict)
+  rule                    ReferralRule         @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+  qualifyingPurchaseOrder PurchaseOrder        @relation(fields: [qualifyingPurchaseOrderId], references: [id], onDelete: Restrict)
+  ledgerEntry             EggLedgerEntry?      @relation(fields: [ledgerEntryId], references: [id], onDelete: SetNull)
+
+  @@unique([relationshipId, qualifyingPurchaseOrderId])
+  @@index([inviterUserId, status])
+  @@index([inviteeUserId])
+  @@index([relationshipId])
+  @@index([qualifyingPurchaseOrderId])
+}
+
+enum PrizeClaimStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  DELIVERED
+  REJECTED
+  CANCELLED
+}
+
+model PrizeClaim {
+  id                      String           @id @default(uuid()) @db.Uuid
+  userId                  String           @db.Uuid
+  prizeKey                String           @db.VarChar(60)
+  prizeName               String           @db.VarChar(120)
+  prizeCategory           String           @db.VarChar(60)
+  requiredInvestmentPaisa BigInt           @db.BigInt
+  verifiedInvestmentPaisa BigInt           @db.BigInt
+  status                  PrizeClaimStatus @default(PENDING)
+  userNote                String?          @db.VarChar(500)
+  adminNote               String?          @db.VarChar(500)
+  reviewedByUserId        String?          @db.Uuid
+  reviewedAt              DateTime?
+  deliveredAt             DateTime?
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, status])
+  @@index([prizeKey])
+  @@index([createdAt])
+}
+
+enum MilestoneClaimStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  COLLECTED
+  REJECTED
+}
+
+model MilestoneRewardClaim {
+  id                         String               @id @default(uuid()) @db.Uuid
+  userId                     String               @db.Uuid
+  milestoneKey               String               @db.VarChar(60)
+  milestoneName              String               @db.VarChar(120)
+  tierNumber                 Int
+  requiredLevel1InvestmentRs Int
+  verifiedLevel1InvestmentRs Int
+  rewardEggUnits             Int
+  status                     MilestoneClaimStatus @default(PENDING)
+  userNote                   String?              @db.VarChar(500)
+  adminNote                  String?              @db.VarChar(500)
+  ledgerEntryId              String?              @db.Uuid
+  reviewedByUserId           String?              @db.Uuid
+  reviewedAt                 DateTime?
+  collectedAt                DateTime?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, milestoneKey])
+  @@index([userId, status])
+  @@index([milestoneKey])
+  @@index([createdAt])
+}
+
+enum EggMarketSaleStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PROCESSING
+  PAID
+  REJECTED
+  CANCELLED
+  COMPLETED
+  REVERSED
+}
+
+enum EggMarketPayoutMethod {
+  JAZZCASH
+  EASYPAISA
+}
+
+model EggMarket {
+  id                 String    @id @default(uuid()) @db.Uuid
+  code               String    @unique @db.VarChar(40)
+  name               String    @db.VarChar(120)
+  description        String?   @db.VarChar(500)
+  minEggs            Int       @default(1)
+  maxEggs            Int       @default(100)
+  pricePerEggPaisa   BigInt    @db.BigInt
+  icon               String?   @db.VarChar(80)
+  imagePath          String?   @db.VarChar(255)
+  imageAlt           String?   @db.VarChar(255)
+  isVerified         Boolean   @default(true)
+  isActive           Boolean   @default(true)
+  isPaused           Boolean   @default(false)
+  displayOrder       Int       @default(0)
+  dailyLimitEggs     Int?
+  totalCapacityEggs  Int?
+  totalEggsPurchased Int       @default(0)
+  opensAt            DateTime?
+  closesAt           DateTime?
+  createdByUserId    String?   @db.Uuid
+  updatedByUserId    String?   @db.Uuid
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  archivedAt         DateTime?
+
+  createdBy   User?           @relation("EggMarketCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy   User?           @relation("EggMarketUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  sales       EggMarketSale[]
+
+  @@index([isActive, isPaused, displayOrder])
+  @@index([archivedAt])
+}
+
+model EggMarketSale {
+  id                         String                @id @default(uuid()) @db.Uuid
+  publicReference            String                @unique @db.VarChar(40)
+  userId                     String                @db.Uuid
+  marketId                   String                @db.Uuid
+  eggQuantity                Int
+  pricePerEggPaisaSnapshot   BigInt                @db.BigInt
+  totalAmountPaisa           BigInt                @db.BigInt
+  payoutMethod               EggMarketPayoutMethod @default(JAZZCASH)
+  accountHolderNameProtected String?               @db.VarChar(255)
+  accountNumberProtected     String?               @db.VarChar(255)
+  accountNumberMasked        String?               @db.VarChar(40)
+  status                     EggMarketSaleStatus   @default(PENDING_PAYMENT)
+  adminTransactionId         String?               @db.VarChar(120)
+  adminNotes                 String?               @db.VarChar(500)
+  rejectionReason            String?               @db.VarChar(500)
+  reviewedByUserId           String?               @db.Uuid
+  submittedAt                DateTime              @default(now())
+  processingAt               DateTime?
+  paidAt                     DateTime?
+  rejectedAt                 DateTime?
+  cancelledAt                DateTime?
+  eggLedgerEntryId           String?               @unique @db.Uuid
+  idempotencyKey             String                @db.VarChar(120)
+  idempotencyRequestHash     String?               @db.VarChar(128)
+  metadata                   Json?
+  reversedAt                 DateTime?
+  reversedByUserId           String?               @db.Uuid
+  reversalReason             String?               @db.VarChar(500)
+  reversalEggLedgerEntryId   String?               @unique @db.Uuid
+  createdAt                  DateTime              @default(now())
+  updatedAt                  DateTime              @updatedAt
+
+  user                   User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  market                 EggMarket       @relation(fields: [marketId], references: [id], onDelete: Restrict)
+  reviewedBy             User?           @relation("EggMarketSaleReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  eggLedgerEntry         EggLedgerEntry? @relation("EggMarketSaleLedgerEntry", fields: [eggLedgerEntryId], references: [id], onDelete: SetNull)
+  reversalEggLedgerEntry EggLedgerEntry? @relation("EggMarketSaleReversalLedgerEntry", fields: [reversalEggLedgerEntryId], references: [id], onDelete: SetNull)
+  reversedBy             User?           @relation("EggMarketSaleReverser", fields: [reversedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status])
+  @@index([marketId])
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+

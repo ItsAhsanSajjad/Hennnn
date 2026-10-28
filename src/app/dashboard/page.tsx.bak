@@ -1,0 +1,940 @@
+import Image from "next/image";
+import Link from "next/link";
+import {
+  Activity,
+  ArrowRight,
+  ArrowUpRight,
+  BadgeCheck,
+  Banknote,
+  Bell,
+  Bird,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardList,
+  Clock3,
+  Egg,
+  ExternalLink,
+  Gift,
+  HelpCircle,
+  History,
+  LayoutDashboard,
+  ListChecks,
+  LockKeyhole,
+  MessageCircle,
+  PackageCheck,
+  Plus,
+  Send,
+  ShieldCheck,
+  ShoppingCart,
+  Sparkles,
+  Sprout,
+  TrendingUp,
+  User,
+  UserRound,
+  Users,
+  WalletCards,
+} from "lucide-react";
+
+import { CopyReferralButton } from "@/components/dashboard/copy-referral-button";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { EmptyState } from "@/components/shared/empty-state";
+import { env } from "@/lib/env/server";
+import { prisma } from "@/lib/database/prisma";
+import { requireUser } from "@/lib/auth/session";
+import { formatDateTime } from "@/lib/utilities/format";
+import { getEggBalance } from "@/server/services/egg-ledger";
+
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  const user = await requireUser();
+  const [
+    activity,
+    notifications,
+    referralCount,
+    activeHensAggregate,
+    pendingPurchases,
+    eggBalance,
+    openSaleRequests,
+    creditedReferralRewards,
+    totalInvestmentAggregate,
+    soldEggsAggregate,
+    totalPaidAggregate,
+    nextOrder,
+    successfulLoginCount,
+    referredBy,
+  ] = await Promise.all([
+    prisma.auditLog.findMany({
+      where: { actorUserId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 4,
+    }),
+    prisma.notification.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 3,
+    }),
+    prisma.referralRelationship.count({ where: { inviterId: user.id } }),
+    prisma.henAsset.aggregate({
+      where: { userId: user.id, status: "ACTIVE" },
+      _sum: { quantity: true },
+    }),
+    prisma.purchaseOrder.count({
+      where: {
+        userId: user.id,
+        status: { in: ["AWAITING_PAYMENT", "PAYMENT_SUBMITTED", "UNDER_REVIEW"] },
+      },
+    }),
+    getEggBalance(user.id),
+    prisma.eggSaleRequest.count({
+      where: {
+        userId: user.id,
+        status: { in: ["AWAITING_REVIEW", "UNDER_REVIEW", "PAYMENT_PROCESSING"] },
+      },
+    }),
+    prisma.referralReward.aggregate({
+      where: { inviterUserId: user.id, status: "CREDITED" },
+      _sum: { rewardEggUnits: true },
+    }),
+    prisma.purchaseOrder.aggregate({
+      where: { userId: user.id, status: "APPROVED" },
+      _sum: { totalAmountPaisa: true },
+    }),
+    prisma.eggSaleRequest.aggregate({
+      where: { userId: user.id, status: "PAID" },
+      _sum: { eggQuantity: true, totalAmountPaisa: true },
+    }),
+    prisma.payout.aggregate({
+      where: { userId: user.id, status: "CONFIRMED" },
+      _sum: { amountPaisa: true },
+    }),
+    prisma.purchaseOrder.findFirst({
+      where: {
+        userId: user.id,
+        status: { in: ["AWAITING_PAYMENT", "PAYMENT_SUBMITTED", "UNDER_REVIEW"] },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { orderReference: true, status: true },
+    }),
+    prisma.auditLog.count({
+      where: { actorUserId: user.id, action: "USER_LOGIN_SUCCEEDED" },
+    }),
+    prisma.referralRelationship.findUnique({
+      where: { inviteeId: user.id },
+      select: { inviter: { select: { username: true } } },
+    }),
+  ]);
+
+  const isFirstVisit = successfulLoginCount === 0;
+  const activeHens = activeHensAggregate._sum.quantity ?? 0;
+  const soldEggs = soldEggsAggregate._sum.eggQuantity ?? 0;
+  const totalInvestmentPaisa = totalInvestmentAggregate._sum.totalAmountPaisa ?? BigInt(0);
+  const totalInvestmentRs = Math.round(Number(totalInvestmentPaisa) / 100);
+  const referralBonusEggs = creditedReferralRewards._sum.rewardEggUnits ?? 0;
+  const eggEarningsPaisa = soldEggsAggregate._sum.totalAmountPaisa ?? BigInt(0);
+  const eggEarningsRs = Math.round(Number(eggEarningsPaisa) / 100);
+  const totalPaidPaisa = totalPaidAggregate._sum.amountPaisa ?? BigInt(0);
+  const totalPaidRs = Math.round(Number(totalPaidPaisa) / 100);
+  const inviterName = referredBy?.inviter?.username ?? null;
+
+  // Open Circular Illustrated Quick Shortcuts
+  const quickShortcuts = [
+    {
+      label: "Plans",
+      href: "/dashboard/plans",
+      icon: ListChecks,
+      bg: "from-[#F59B52] to-[#D8793F]",
+      shadow: "shadow-amber-500/20",
+    },
+    {
+      label: "Buy Hens",
+      href: "/dashboard/plans",
+      icon: ShoppingCart,
+      bg: "from-[#F29A4A] to-[#E27D38]",
+      shadow: "shadow-orange-500/20",
+    },
+    {
+      label: "My Hens",
+      href: "/dashboard/hens",
+      icon: Bird,
+      bg: "from-[#0D3850] to-[#061A2B]",
+      shadow: "shadow-sky-950/25",
+    },
+    {
+      label: "Egg Ledger",
+      href: "/dashboard/egg-ledger",
+      icon: Egg,
+      bg: "from-[#E6A046] to-[#C97B28]",
+      shadow: "shadow-amber-600/20",
+    },
+    {
+      label: "Sell Eggs",
+      href: "/dashboard/sell-eggs",
+      icon: Banknote,
+      bg: "from-[#2D9B78] to-[#1C7358]",
+      shadow: "shadow-emerald-600/20",
+    },
+    {
+      label: "Orders",
+      href: "/dashboard/orders",
+      icon: PackageCheck,
+      bg: "from-[#09263A] to-[#04121A]",
+      shadow: "shadow-slate-900/25",
+    },
+    {
+      label: "Egg Sales",
+      href: "/dashboard/egg-sales",
+      icon: ClipboardList,
+      bg: "from-[#D8793F] to-[#B55925]",
+      shadow: "shadow-orange-700/20",
+    },
+    {
+      label: "Referrals",
+      href: "/dashboard/referrals",
+      icon: Users,
+      bg: "from-[#5B4699] to-[#3B2C68]",
+      shadow: "shadow-purple-700/20",
+    },
+    {
+      label: "Payments",
+      href: "/dashboard/payout-methods",
+      icon: WalletCards,
+      bg: "from-[#2A8275] to-[#1B5E54]",
+      shadow: "shadow-teal-700/20",
+    },
+    {
+      label: "Profile",
+      href: "/dashboard/profile",
+      icon: UserRound,
+      bg: "from-[#061A2B] to-[#0D3850]",
+      shadow: "shadow-slate-950/25",
+    },
+  ];
+
+  return (
+    <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300">
+      {/* 1. Header Section */}
+      <DashboardHeader
+        username={user.username}
+        status={user.status}
+        isFirstVisit={isFirstVisit}
+      />
+
+      {/* 2. First Summary Row (3 Reference Proportioned Cards) */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6" aria-label="Overview Summary">
+        {/* Card 1: Member Profile */}
+        <div
+          style={{
+            boxShadow: "0 12px 28px rgba(16, 34, 45, 0.08), 0 3px 0 rgba(216, 121, 63, 0.18)",
+          }}
+          className="relative overflow-hidden rounded-3xl bg-[#FFFDF4] border border-[#D8793F]/25 p-5 sm:p-6 flex flex-col justify-between group transition-transform hover:-translate-y-0.5"
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3.5">
+              <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#F59B52] to-[#D8793F] text-white text-xl font-black shadow-md shadow-[#D8793F]/25">
+                {user.username.slice(0, 1).toUpperCase()}
+              </span>
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-wider text-[#8C3A14]">
+                  MEMBER PROFILE
+                </p>
+                <h3 className="flex items-center gap-1.5 text-lg font-black text-[#17372F]">
+                  <span className="truncate max-w-[130px]">{user.username}</span>
+                  <BadgeCheck size={18} className="text-[#D8793F] shrink-0" />
+                </h3>
+                {inviterName ? (
+                  <p className="text-xs font-semibold text-[#566D7E] mt-0.5">
+                    Sponsor: <span className="font-bold text-[#D8793F]">@{inviterName}</span>
+                  </p>
+                ) : (
+                  <p className="text-xs font-semibold text-[#566D7E] mt-0.5">Direct Member</p>
+                )}
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-600/30 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
+              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Active
+            </span>
+          </div>
+
+          <div className="mt-5 pt-3.5 border-t border-[#17372F]/10 flex items-center justify-between">
+            <span className="text-xs font-bold text-[#566D7E]">Flock Account</span>
+            <Link
+              href="/dashboard/profile"
+              className="inline-flex items-center gap-1 text-xs font-black text-[#D8793F] hover:text-[#8C3A14] transition"
+            >
+              View Profile <ArrowRight size={13} />
+            </Link>
+          </div>
+        </div>
+
+        {/* Card 2: Available Eggs (Visually Dominant with 3D Golden Egg Image Overlap) */}
+        <div
+          style={{
+            background: "linear-gradient(135deg, #FFFDF4 0%, #FFF3DF 100%)",
+            boxShadow: "0 14px 32px rgba(216, 121, 63, 0.16), 0 3px 0 #D8793F",
+          }}
+          className="relative overflow-hidden rounded-3xl border-2 border-[#D8793F]/40 p-5 sm:p-6 flex flex-col justify-between group transition-transform hover:-translate-y-0.5"
+        >
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-black uppercase tracking-wider text-[#8C3A14]">
+                AVAILABLE EGGS
+              </p>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#D8793F]/15 border border-[#D8793F]/30 px-2.5 py-0.5 text-[10px] font-extrabold text-[#8C3A14]">
+                Ready to sell
+              </span>
+            </div>
+            <h2 className="mt-2 text-3xl sm:text-4xl font-black text-[#17372F] tracking-tight">
+              {eggBalance.toLocaleString()}
+              <span className="text-base sm:text-lg font-bold text-[#8C3A14] ml-1.5">Eggs</span>
+            </h2>
+            <p className="text-xs font-semibold text-emerald-700 mt-1 flex items-center gap-1">
+              <CheckCircle2 size={13} className="shrink-0" /> Verified in ledger
+            </p>
+          </div>
+
+          {/* Large Overlapping 3D Golden Egg Image */}
+          <div className="absolute right-2 bottom-1 size-24 sm:size-28 pointer-events-none transition-transform group-hover:scale-108 duration-300 drop-shadow-md">
+            <Image
+              src="/dashboard/golden-egg-3d.jpg"
+              alt="Golden Egg"
+              width={120}
+              height={120}
+              className="object-contain w-full h-full rounded-2xl"
+            />
+          </div>
+
+          <div className="mt-5 pt-3.5 border-t border-[#17372F]/10 flex items-center gap-4 relative z-10">
+            <Link
+              href="/dashboard/sell-eggs"
+              className="inline-flex items-center gap-1 text-xs font-black text-[#2D9B78] hover:underline"
+            >
+              Sell Eggs <ArrowRight size={13} />
+            </Link>
+            <Link
+              href="/dashboard/egg-ledger"
+              className="inline-flex items-center gap-1 text-xs font-bold text-[#D8793F] hover:text-[#8C3A14] transition"
+            >
+              Egg Ledger <ArrowRight size={13} />
+            </Link>
+          </div>
+        </div>
+
+        {/* Card 3: Active Flock (With 3D Brown Hen Overlap) */}
+        <div
+          style={{
+            boxShadow: "0 12px 28px rgba(16, 34, 45, 0.08), 0 3px 0 rgba(216, 121, 63, 0.18)",
+          }}
+          className="relative overflow-hidden rounded-3xl bg-[#FFFDF4] border border-[#D8793F]/25 p-5 sm:p-6 flex flex-col justify-between group transition-transform hover:-translate-y-0.5"
+        >
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-black uppercase tracking-wider text-[#8C3A14]">
+                ACTIVE FLOCK
+              </p>
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-600/30 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-800">
+                Daily yield active
+              </span>
+            </div>
+            <h2 className="mt-2 text-3xl sm:text-4xl font-black text-[#17372F] tracking-tight">
+              {activeHens.toLocaleString()}
+              <span className="text-base sm:text-lg font-bold text-[#566D7E] ml-1.5">Total hens</span>
+            </h2>
+            <p className="text-xs font-semibold text-[#D8793F] mt-1 flex items-center gap-1">
+              <Sprout size={13} className="shrink-0" /> Producing daily eggs
+            </p>
+          </div>
+
+          {/* Large Overlapping 3D Brown Hen Image */}
+          <div className="absolute right-2 bottom-1 size-24 sm:size-28 pointer-events-none transition-transform group-hover:scale-108 duration-300 drop-shadow-md">
+            <Image
+              src="/dashboard/brown-hen-3d.jpg"
+              alt="Brown Hen"
+              width={120}
+              height={120}
+              className="object-contain w-full h-full rounded-2xl"
+            />
+          </div>
+
+          <div className="mt-5 pt-3.5 border-t border-[#17372F]/10 flex items-center gap-4 relative z-10">
+            <Link
+              href="/dashboard/plans"
+              className="inline-flex items-center gap-1 text-xs font-black text-[#D8793F] hover:text-[#8C3A14] transition"
+            >
+              Buy More Hens <ArrowRight size={13} />
+            </Link>
+            <Link
+              href="/dashboard/hens"
+              className="inline-flex items-center gap-1 text-xs font-bold text-[#09263A] hover:underline"
+            >
+              My Flock <ArrowRight size={13} />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. Buy Hens & Sell Eggs Banners (Compact, Playful, Visual) */}
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6" aria-label="Quick Actions">
+        {/* Buy Hens Banner */}
+        <div
+          style={{
+            background: "linear-gradient(135deg, #F59B52 0%, #D8793F 100%)",
+            boxShadow: "0 14px 34px rgba(216, 121, 63, 0.35), 0 3px 0 #8C3A14",
+          }}
+          className="relative overflow-hidden rounded-3xl p-5 sm:p-7 text-white border border-[#FFD0A5]/40 flex items-center justify-between group transition-transform hover:-translate-y-1"
+        >
+          {/* Overlapping 3D Brown Hen Graphic on Left */}
+          <div className="size-20 sm:size-24 shrink-0 rounded-2xl overflow-hidden shadow-md border-2 border-white/40 bg-white/20 mr-4 transition-transform group-hover:scale-105">
+            <Image
+              src="/dashboard/brown-hen-3d.jpg"
+              alt="Buy Hens"
+              width={96}
+              height={96}
+              className="object-cover w-full h-full"
+            />
+          </div>
+
+          <div className="flex-1 min-w-0 pr-3">
+            <span className="text-[11px] font-black uppercase tracking-wider text-white/90">
+              Grow your flock
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black leading-tight text-white mt-0.5">
+              Buy Hens
+            </h2>
+            <p className="text-xs text-white/85 mt-0.5 line-clamp-1">
+              Add verified hens to start daily collection
+            </p>
+          </div>
+
+          <Link
+            href="/dashboard/plans"
+            style={{
+              backgroundColor: "#FFFDF4",
+              color: "#8C3A14",
+              boxShadow: "0 3px 0 #8C3A14, 0 8px 16px rgba(0,0,0,0.18)",
+            }}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl px-4 sm:px-5 py-3 text-xs sm:text-sm font-black transition hover:bg-white active:translate-y-0.5"
+          >
+            <span>Buy Hens</span>
+            <ArrowRight size={15} />
+          </Link>
+        </div>
+
+        {/* Sell Eggs Banner */}
+        <div
+          style={{
+            background: "linear-gradient(135deg, #0D3850 0%, #061A2B 100%)",
+            boxShadow: "0 14px 34px rgba(6, 26, 43, 0.45), 0 3px 0 #04121A",
+          }}
+          className="relative overflow-hidden rounded-3xl p-5 sm:p-7 text-white border border-[#D8793F]/35 flex items-center justify-between group transition-transform hover:-translate-y-1"
+        >
+          {/* Overlapping 3D Egg Basket Graphic */}
+          <div className="size-20 sm:size-24 shrink-0 rounded-2xl overflow-hidden shadow-md border-2 border-white/20 bg-white/10 mr-4 transition-transform group-hover:scale-105">
+            <Image
+              src="/dashboard/egg-basket-3d.jpg"
+              alt="Sell Eggs"
+              width={96}
+              height={96}
+              className="object-cover w-full h-full"
+            />
+          </div>
+
+          <div className="flex-1 min-w-0 pr-3">
+            <span className="text-[11px] font-black uppercase tracking-wider text-[#FFD0A5]">
+              Turn eggs into value
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black leading-tight text-[#FFFDF4] mt-0.5">
+              Sell Eggs
+            </h2>
+            <p className="text-xs text-[#DCE8E8]/85 mt-0.5 line-clamp-1">
+              Convert eggs into direct bank payouts
+            </p>
+          </div>
+
+          <Link
+            href="/dashboard/sell-eggs"
+            style={{
+              background: "linear-gradient(180deg, #F59B52 0%, #D8793F 100%)",
+              boxShadow: "0 3px 0 #04121A, 0 8px 16px rgba(0,0,0,0.25)",
+            }}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl px-4 sm:px-5 py-3 text-xs sm:text-sm font-black text-white transition hover:brightness-105 active:translate-y-0.5"
+          >
+            <span>Sell Eggs</span>
+            <ArrowRight size={15} />
+          </Link>
+        </div>
+      </section>
+
+      {/* 4. Referral Link & Pending Activity (2 Columns) */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6" aria-label="Referral & Activity">
+        {/* Referral Card */}
+        <div
+          style={{
+            boxShadow: "0 12px 28px rgba(16, 34, 45, 0.08), 0 3px 0 rgba(216, 121, 63, 0.18)",
+          }}
+          className="rounded-3xl bg-[#FFFDF4] border border-[#D8793F]/25 p-5 sm:p-6 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#D8793F]/15 text-[#8C3A14]">
+                <Users size={13} /> GROW TOGETHER
+              </span>
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                {referralCount} Members Joined
+              </span>
+            </div>
+
+            <h3 className="mt-3.5 text-xl font-black text-[#17372F]">
+              Your referral link
+            </h3>
+            <p className="mt-1 text-xs text-[#566D7E] leading-relaxed">
+              Share your link and invite new members to join your flock.
+            </p>
+
+            <div className="mt-4">
+              <CopyReferralButton
+                referralCode={user.referralCode}
+                appUrl={env.NEXT_PUBLIC_APP_URL}
+                buttonLabel="Copy Link"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-[#17372F]/10 flex items-center justify-between">
+            <span className="text-xs font-bold text-[#566D7E]">
+              Bonus Eggs: <span className="text-[#D8793F] font-black">{referralBonusEggs}</span>
+            </span>
+            <Link
+              href="/dashboard/referrals"
+              className="inline-flex items-center gap-1 text-xs font-black text-[#D8793F] hover:text-[#8C3A14] transition"
+            >
+              View Full Team <ArrowRight size={13} />
+            </Link>
+          </div>
+        </div>
+
+        {/* Pending Activity */}
+        <div
+          style={{
+            boxShadow: "0 12px 28px rgba(16, 34, 45, 0.08), 0 3px 0 rgba(216, 121, 63, 0.18)",
+          }}
+          className="rounded-3xl bg-[#FFFDF4] border border-[#D8793F]/25 p-5 sm:p-6 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#0D3850]/10 text-[#09263A]">
+                <Clock3 size={13} /> IN PROCESS
+              </span>
+              <span className="text-xs font-bold text-[#566D7E]">Review Status</span>
+            </div>
+
+            <h3 className="mt-3.5 text-xl font-black text-[#17372F]">
+              Pending activity
+            </h3>
+            <p className="mt-1 text-xs text-[#566D7E] leading-relaxed">
+              Items waiting for payment review and settlement.
+            </p>
+
+            {/* 2 Compact Internal Visual Tiles */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-[#D8793F]/20 bg-[#FFF8EC] p-3.5 flex items-center gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#F59B52] to-[#D8793F] text-white shadow-xs">
+                  <Bird size={20} />
+                </span>
+                <div>
+                  <p className="text-xl font-black text-[#17372F]">{pendingPurchases}</p>
+                  <p className="text-[11px] font-bold text-[#566D7E]">Pending Orders</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#D8793F]/20 bg-[#FFF8EC] p-3.5 flex items-center gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#0D3850] text-[#FFD0A5] shadow-xs">
+                  <Egg size={20} />
+                </span>
+                <div>
+                  <p className="text-xl font-black text-[#17372F]">{openSaleRequests}</p>
+                  <p className="text-[11px] font-bold text-[#566D7E]">Pending Sales</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-[#17372F]/10 flex items-center justify-between">
+            <span className="text-xs font-semibold text-[#566D7E]">
+              {nextOrder ? `Order #${nextOrder.orderReference}` : "All orders synchronized"}
+            </span>
+            <Link
+              href="/dashboard/orders"
+              className="inline-flex items-center gap-1 text-xs font-black text-[#D8793F] hover:text-[#8C3A14] transition"
+            >
+              View Orders <ArrowRight size={13} />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. WhatsApp Support Panel */}
+      <section
+        style={{
+          boxShadow: "0 12px 28px rgba(16, 34, 45, 0.08), 0 3px 0 rgba(216, 121, 63, 0.18)",
+        }}
+        className="rounded-3xl bg-[#FFFDF4] border border-[#D8793F]/25 p-5 sm:p-6"
+        aria-label="WhatsApp Community Support"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+              WE ARE HERE TO HELP
+            </span>
+            <h3 className="mt-1.5 text-xl font-black text-[#17372F]">
+              WhatsApp Support
+            </h3>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <a
+            href="https://chat.whatsapp.com/growmeta-egg"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3.5 rounded-2xl border border-[#25D366]/30 bg-[#25D366]/10 transition hover:bg-[#25D366]/20 group cursor-pointer"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#25D366] text-[#042010] shadow-xs group-hover:scale-105 transition">
+              <MessageCircle size={20} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-black text-[#042010] truncate">WhatsApp Support</p>
+              <p className="text-[11px] font-semibold text-[#566D7E]">Staff Helpdesk</p>
+            </div>
+          </a>
+
+          <a
+            href="https://whatsapp.com/channel/growmeta-egg"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3.5 rounded-2xl border border-[#25D366]/30 bg-[#25D366]/10 transition hover:bg-[#25D366]/20 group cursor-pointer"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#25D366] text-[#042010] shadow-xs group-hover:scale-105 transition">
+              <Send size={18} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-black text-[#042010] truncate">Official Channel</p>
+              <p className="text-[11px] font-semibold text-[#566D7E]">Announcements</p>
+            </div>
+          </a>
+
+          <a
+            href="https://chat.whatsapp.com/growmeta-egg"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3.5 rounded-2xl border border-[#25D366]/30 bg-[#25D366]/10 transition hover:bg-[#25D366]/20 group cursor-pointer"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#25D366] text-[#042010] shadow-xs group-hover:scale-105 transition">
+              <Users size={18} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-black text-[#042010] truncate">Member Group</p>
+              <p className="text-[11px] font-semibold text-[#566D7E]">Community Chat</p>
+            </div>
+          </a>
+
+          <a
+            href="https://chat.whatsapp.com/growmeta-egg"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3.5 rounded-2xl border border-[#25D366]/30 bg-[#25D366]/10 transition hover:bg-[#25D366]/20 group cursor-pointer"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#25D366] text-[#042010] shadow-xs group-hover:scale-105 transition">
+              <ShieldCheck size={18} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-black text-[#042010] truncate">Admin Helpline</p>
+              <p className="text-[11px] font-semibold text-[#566D7E]">Payment Inquiries</p>
+            </div>
+          </a>
+        </div>
+      </section>
+
+      {/* 6. Open Quick Access Section (NO BOXED WHITE CARD - OPEN ON SAND BACKGROUND) */}
+      <section aria-label="Farm Shortcuts" className="pt-2">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <span className="text-[11px] font-black uppercase tracking-wider text-[#8C3A14]">
+              QUICK ACCESS
+            </span>
+            <h3 className="text-xl sm:text-2xl font-black text-[#17372F]">
+              Farm shortcuts
+            </h3>
+          </div>
+          <span className="text-xs font-bold text-[#566D7E]">Tap to open</span>
+        </div>
+
+        {/* 10 Round Illustrated Buttons in 2 Rows */}
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 sm:gap-6">
+          {quickShortcuts.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="group flex flex-col items-center justify-center text-center transition-transform hover:-translate-y-1.5 focus:outline-none"
+              >
+                {/* Circular Colored Illustrated Button */}
+                <div
+                  className={`size-16 sm:size-18 rounded-full bg-gradient-to-br ${item.bg} text-white grid place-items-center shadow-lg ${item.shadow} border-2 border-white/60 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-2`}
+                >
+                  <Icon size={24} className="transition-transform group-hover:scale-110" />
+                </div>
+                {/* Clean Label Underneath */}
+                <span className="mt-2.5 text-xs sm:text-sm font-black text-[#17372F] group-hover:text-[#D8793F] transition-colors truncate w-full">
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 7. Daily Egg Collection (Wide Feature Card) */}
+      <section
+        style={{
+          boxShadow: "0 14px 34px rgba(16, 34, 45, 0.08), 0 3px 0 rgba(216, 121, 63, 0.18)",
+        }}
+        className="rounded-3xl bg-[#FFFDF4] border border-[#D8793F]/25 p-5 sm:p-7 relative overflow-hidden"
+        aria-label="Daily Egg Collection"
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div className="flex items-center gap-4 sm:gap-5">
+            {/* 3D Golden Egg Graphic */}
+            <div className="size-16 sm:size-20 shrink-0 rounded-2xl overflow-hidden shadow-md border-2 border-[#D8793F]/30 bg-[#FFF8EC]">
+              <Image
+                src="/dashboard/golden-egg-3d.jpg"
+                alt="Egg Collection"
+                width={80}
+                height={80}
+                className="object-cover w-full h-full"
+              />
+            </div>
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#D8793F]/15 text-[#8C3A14]">
+                <Sparkles size={12} /> DAILY COLLECTION
+              </span>
+              <h2 className="mt-1 text-xl sm:text-2xl font-black text-[#17372F]">
+                {activeHens > 0 ? "Daily Egg Collection" : "Start collecting eggs"}
+              </h2>
+              <p className="text-xs sm:text-sm text-[#566D7E] mt-0.5 max-w-xl">
+                {activeHens > 0
+                  ? `Your flock of ${activeHens} active hen${activeHens === 1 ? "" : "s"} is producing daily eggs.`
+                  : "Buy your first hen plan to begin daily egg collection."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <Link
+              href="/dashboard/egg-ledger"
+              className="inline-flex items-center gap-2 rounded-2xl border border-[#D8793F]/30 bg-[#FFF8EC] px-4 py-2.5 text-xs sm:text-sm font-bold text-[#8C3A14] hover:bg-[#FFF3DF] transition"
+            >
+              <Egg size={15} /> Open Ledger
+            </Link>
+            {activeHens > 0 ? (
+              <Link
+                href="/dashboard/sell-eggs"
+                style={{
+                  background: "linear-gradient(180deg, #F59B52 0%, #D8793F 100%)",
+                  boxShadow: "0 3px 0 #8C3A14",
+                }}
+                className="inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs sm:text-sm font-black text-white hover:brightness-105 transition"
+              >
+                <Banknote size={15} /> Sell Eggs
+              </Link>
+            ) : (
+              <Link
+                href="/dashboard/plans"
+                style={{
+                  background: "linear-gradient(180deg, #F59B52 0%, #D8793F 100%)",
+                  boxShadow: "0 3px 0 #8C3A14",
+                }}
+                className="inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs sm:text-sm font-black text-white hover:brightness-105 transition"
+              >
+                <ShoppingCart size={15} /> Buy a Hen
+              </Link>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* 8. Farm Performance Statistics (7 Supported Farm Metrics) */}
+      <section aria-label="Farm Performance">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <span className="text-[11px] font-black uppercase tracking-wider text-[#8C3A14]">
+              FARM PERFORMANCE
+            </span>
+            <h3 className="text-xl sm:text-2xl font-black text-[#17372F]">
+              Your farming stats
+            </h3>
+          </div>
+          <span className="text-xs font-bold text-[#566D7E]">Real-Time Ledger</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
+          {/* Stat 1: Total Hens */}
+          <div
+            style={{
+              boxShadow: "0 8px 20px rgba(16, 34, 45, 0.06), 0 2px 0 rgba(216, 121, 63, 0.15)",
+            }}
+            className="rounded-3xl border border-[#D8793F]/20 bg-[#FFFDF4] p-4 relative overflow-hidden group"
+          >
+            <p className="text-xs font-bold text-[#566D7E]">Total Hens</p>
+            <p className="mt-1 text-2xl sm:text-3xl font-black text-[#17372F]">{activeHens}</p>
+            <p className="text-[11px] font-semibold text-emerald-700 mt-0.5">Active flock</p>
+          </div>
+
+          {/* Stat 2: Available Eggs */}
+          <div
+            style={{
+              boxShadow: "0 8px 20px rgba(16, 34, 45, 0.06), 0 2px 0 rgba(216, 121, 63, 0.15)",
+            }}
+            className="rounded-3xl border border-[#D8793F]/20 bg-[#FFFDF4] p-4 relative overflow-hidden group"
+          >
+            <p className="text-xs font-bold text-[#566D7E]">Available Eggs</p>
+            <p className="mt-1 text-2xl sm:text-3xl font-black text-[#D8793F]">{eggBalance}</p>
+            <p className="text-[11px] font-semibold text-[#566D7E] mt-0.5">Ready for sale</p>
+          </div>
+
+          {/* Stat 3: Sold Eggs */}
+          <div
+            style={{
+              boxShadow: "0 8px 20px rgba(16, 34, 45, 0.06), 0 2px 0 rgba(216, 121, 63, 0.15)",
+            }}
+            className="rounded-3xl border border-[#D8793F]/20 bg-[#FFFDF4] p-4 relative overflow-hidden group"
+          >
+            <p className="text-xs font-bold text-[#566D7E]">Sold Eggs</p>
+            <p className="mt-1 text-2xl sm:text-3xl font-black text-[#17372F]">{soldEggs}</p>
+            <p className="text-[11px] font-semibold text-emerald-700 mt-0.5">Completed sales</p>
+          </div>
+
+          {/* Stat 4: Total Investment */}
+          <div
+            style={{
+              boxShadow: "0 8px 20px rgba(16, 34, 45, 0.06), 0 2px 0 rgba(216, 121, 63, 0.15)",
+            }}
+            className="rounded-3xl border border-[#D8793F]/20 bg-[#FFFDF4] p-4 relative overflow-hidden group"
+          >
+            <p className="text-xs font-bold text-[#566D7E]">Total Investment</p>
+            <p className="mt-1 text-2xl sm:text-3xl font-black text-[#17372F]">
+              Rs {totalInvestmentRs.toLocaleString()}
+            </p>
+            <p className="text-[11px] font-semibold text-[#566D7E] mt-0.5">Approved purchases</p>
+          </div>
+
+          {/* Stat 5: Referral Bonus */}
+          <div
+            style={{
+              boxShadow: "0 8px 20px rgba(16, 34, 45, 0.06), 0 2px 0 rgba(216, 121, 63, 0.15)",
+            }}
+            className="rounded-3xl border border-[#D8793F]/20 bg-[#FFFDF4] p-4 relative overflow-hidden group"
+          >
+            <p className="text-xs font-bold text-[#566D7E]">Referral Bonus</p>
+            <p className="mt-1 text-2xl sm:text-3xl font-black text-[#D8793F]">
+              {referralBonusEggs} <span className="text-sm">Eggs</span>
+            </p>
+            <p className="text-[11px] font-semibold text-emerald-700 mt-0.5">Earned rewards</p>
+          </div>
+
+          {/* Stat 6: Egg Earnings */}
+          <div
+            style={{
+              boxShadow: "0 8px 20px rgba(16, 34, 45, 0.06), 0 2px 0 rgba(216, 121, 63, 0.15)",
+            }}
+            className="rounded-3xl border border-[#D8793F]/20 bg-[#FFFDF4] p-4 relative overflow-hidden group"
+          >
+            <p className="text-xs font-bold text-[#566D7E]">Egg Earnings</p>
+            <p className="mt-1 text-2xl sm:text-3xl font-black text-[#2D9B78]">
+              Rs {eggEarningsRs.toLocaleString()}
+            </p>
+            <p className="text-[11px] font-semibold text-[#566D7E] mt-0.5">Paid out</p>
+          </div>
+
+          {/* Stat 7: Total Paid */}
+          <div
+            style={{
+              boxShadow: "0 8px 20px rgba(16, 34, 45, 0.06), 0 2px 0 rgba(216, 121, 63, 0.15)",
+            }}
+            className="rounded-3xl border border-[#D8793F]/20 bg-[#FFFDF4] p-4 relative overflow-hidden group col-span-2 sm:col-span-1"
+          >
+            <p className="text-xs font-bold text-[#566D7E]">Total Paid</p>
+            <p className="mt-1 text-2xl sm:text-3xl font-black text-emerald-800">
+              Rs {totalPaidRs.toLocaleString()}
+            </p>
+            <p className="text-[11px] font-semibold text-emerald-700 mt-0.5">Settled payouts</p>
+          </div>
+        </div>
+      </section>
+
+      {/* 9. Compact Recent Updates Bar */}
+      <section
+        style={{
+          boxShadow: "0 8px 20px rgba(16, 34, 45, 0.06), 0 2px 0 rgba(216, 121, 63, 0.15)",
+        }}
+        className="rounded-3xl bg-[#FFFDF4] border border-[#D8793F]/25 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        aria-label="Recent Updates"
+      >
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 place-items-center rounded-2xl bg-[#D8793F]/15 text-[#8C3A14]">
+            <History size={20} />
+          </span>
+          <div>
+            <h4 className="text-sm font-black text-[#17372F]">Account History &amp; Notices</h4>
+            <p className="text-xs text-[#566D7E]">
+              View your complete activity timeline and notifications
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <Link
+            href="/dashboard/activity"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#D8793F]/30 bg-[#FFF8EC] px-3.5 py-2 text-xs font-bold text-[#8C3A14] hover:bg-[#FFF3DF] transition"
+          >
+            <Activity size={14} /> Full Activity
+          </Link>
+          <Link
+            href="/dashboard/notifications"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#D8793F]/30 bg-[#FFF8EC] px-3.5 py-2 text-xs font-bold text-[#8C3A14] hover:bg-[#FFF3DF] transition"
+          >
+            <Bell size={14} /> Notifications
+          </Link>
+        </div>
+      </section>
+
+      {/* 10. Farm Footer */}
+      <footer className="pt-4 pb-6 text-center text-xs font-semibold text-[#566D7E] border-t border-[#D8793F]/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <p>© 2026 GrowMeta Egg. All rights reserved.</p>
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard/plans" className="hover:text-[#D8793F] transition">
+            Plans
+          </Link>
+          <Link href="/dashboard/sell-eggs" className="hover:text-[#D8793F] transition">
+            Sell Eggs
+          </Link>
+          <Link href="/dashboard/referrals" className="hover:text-[#D8793F] transition">
+            Referrals
+          </Link>
+          <a
+            href="https://chat.whatsapp.com/growmeta-egg"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#25D366] font-bold hover:underline"
+          >
+            WhatsApp Support
+          </a>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+

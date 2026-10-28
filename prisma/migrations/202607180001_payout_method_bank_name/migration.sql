@@ -1,0 +1,2 @@
+ALTER TABLE "PayoutMethod"
+  ADD COLUMN IF NOT EXISTS "bankName" VARCHAR(120);
